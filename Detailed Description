@@ -1,0 +1,31 @@
+This project is based on my Python version of the classic card game War, where I used object-oriented programming (OOP) concepts with classes such as Card, Deck, and Player.
+Each class handled part of the game logic — for example:
+
+Card defined the rank, suit, and value of a playing card
+
+Deck created and shuffled all 52 cards
+
+Player managed each player’s deck and card actions
+
+Later, I recreated the same logic in JavaScript to make it interactive and visual in a web browser.
+The web version shows cards flipping, players competing, and “WAR” rounds with smooth animations.
+
+Features:
+
+Class-based Python logic converted to JavaScript
+
+Shuffling and dealing of cards
+
+Animated card flips for each round
+
+“WAR” condition handled automatically
+
+Buttons for Start, Step, Auto Play, and Reset
+
+How to use:
+
+Download or clone this project
+
+Open war_game.html in your browser
+
+Click “Start Game” and enjoy the animated version of your Python program
