@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>War Card Game — Web Animation</title>
+  <style>
+    :root{--bg:#0b1220;--card:#ffffff;--panel:#0f1b2b;--accent:#2dd4bf}
+    body{margin:0;font-family:Inter, system-ui, Arial, sans-serif;background:linear-gradient(180deg,#061223 0%, #071a2a 100%);color:#e6eef6;display:flex;min-height:100vh;align-items:center;justify-content:center}
+    .wrap{width:980px;max-width:96vw;padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    h1{font-size:20px;margin:0}
+    .controls{display:flex;gap:8px}
+    button{background:var(--panel);border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.primary{background:var(--accent);color:#012;box-shadow:0 6px 18px rgba(45,212,191,0.12)}
+    .board{display:grid;grid-template-columns:1fr 1fr;gap:18px;background:rgba(255,255,255,0.02);padding:18px;border-radius:12px}
+    .player{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);padding:14px;border-radius:8px;min-height:220px;display:flex;flex-direction:column;align-items:center}
+    .player h2{margin:0 0 8px 0;font-size:16px}
+    .deck-count{font-size:13px;color:#9fb3c8;margin-bottom:8px}
+    .pile{position:relative;width:220px;height:140px;margin:8px}
+    .card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotateX(0deg);width:140px;height:90px;border-radius:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:var(--card);color:#012;font-weight:700;box-shadow:0 8px 22px rgba(2,6,23,0.6);backface-visibility:hidden;transition:transform 400ms ease, opacity 300ms ease}
+    .card.face-down{background:linear-gradient(180deg,#05263b,#07334a);color:transparent}
+    .card.small{width:100px;height:64px}
+    .card .suit{font-size:22px}
+    .card .rank{font-size:14px}
+    .table-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
+    .vs{font-size:18px;margin-bottom:6px}
+    .log{margin-top:12px;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;height:110px;overflow:auto;font-size:13px;color:#bcd6e6}
+    .status{display:flex;gap:12px;align-items:center}
+    .indicator{font-size:13px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .message{font-weight:600}
+    footer{margin-top:10px;color:#9fb3c8;font-size:13px}
+    @media (max-width:640px){.board{grid-template-columns:1fr} .pile{width:180px;height:120px}.card{width:120px;height:78px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>War — Card Game Animation</h1>
+      <div class="controls">
+        <button id="startBtn" class="primary">Start Game</button>
+        <button id="stepBtn">Step Round</button>
+        <button id="autoBtn">Auto Play</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </header>
+
+    <div class="board">
+      <div class="player" id="playerOne">
+        <h2>Player One</h2>
+        <div class="deck-count" id="countOne">Cards: 26</div>
+        <div class="pile" id="pileOne"></div>
+      </div>
+
+      <div class="player" id="playerTwo">
+        <h2>Player Two</h2>
+        <div class="deck-count" id="countTwo">Cards: 26</div>
+        <div class="pile" id="pileTwo"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:18px;margin-top:12px;align-items:flex-start">
+      <div style="flex:1">
+        <div class="table-center">
+          <div class="vs">Round: <span id="roundNum">0</span></div>
+          <div class="status">
+            <div class="indicator">Last Winner: <span id="lastWinner">—</span></div>
+            <div class="indicator">At War: <span id="atWar">No</span></div>
+          </div>
+        </div>
+
+        <div class="log" id="log"></div>
+      </div>
+      <div style="width:260px">
+        <div style="background:rgba(255,255,255,0.02);padding:10px;border-radius:8px">
+          <div style="font-size:14px;margin-bottom:6px;font-weight:600">Controls & Tips</div>
+          <ul style="margin:0 0 8px 18px;padding:0;color:#9fb3c8">
+            <li>Click <strong>Start</strong> to shuffle & deal.</li>
+            <li>Use <strong>Step Round</strong> to animate one round.</li>
+            <li><strong>Auto Play</strong> will play rounds every 700ms.</li>
+            <li>War places 4 face-down cards + 1 face-up (if available).</li>
+          </ul>
+          <div style="font-size:13px;color:#bcd6e6">This uses your game's rules ported to JS and animates card movement.</div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Save this file as <code>war_game.html</code> and open in a modern browser to run.</footer>
+  </div>
+
+  <script>
+    // ----- Game implementation (JS port of your Python logic) -----
+    const suits = ['Hearts','Diamonds','Spades','Clubs'];
+    const ranks = ['Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Jack','Queen','King','Ace'];
+    const values = {Two:2,Three:3,Four:4,Five:5,Six:6,Seven:7,Eight:8,Nine:9,Ten:10,Jack:11,Queen:12,King:13,Ace:14};
+
+    function Card(suit,rank){
+      return {suit,rank,value:values[rank]};
+    }
+
+    function Deck(){
+      const all = [];
+      for(const s of suits) for(const r of ranks) all.push(Card(s,r));
+      return {all, shuffle(){
+        for(let i=this.all.length-1;i>0;i--){
+          const j=Math.floor(Math.random()*(i+1));[this.all[i],this.all[j]]=[this.all[j],this.all[i]];
+        }
+      }, deal_one(){return this.all.pop();}}
+    }
+
+    function Player(name){return {name, all_cards:[], remove_one(){return this.all_cards.shift();}, add_cards(new_cards){
+      if(Array.isArray(new_cards)) this.all_cards.push(...new_cards); else this.all_cards.push(new_cards);
+    }, count(){return this.all_cards.length}}}
+
+    // UI elements
+    const pileOne = document.getElementById('pileOne');
+    const pileTwo = document.getElementById('pileTwo');
+    const countOne = document.getElementById('countOne');
+    const countTwo = document.getElementById('countTwo');
+    const logEl = document.getElementById('log');
+    const roundNum = document.getElementById('roundNum');
+    const lastWinner = document.getElementById('lastWinner');
+    const atWarEl = document.getElementById('atWar');
+
+    let player_one, player_two, new_deck;
+    let game_on=false, round=0;
+    let autoInterval = null;
+
+    // create card DOM
+    function renderCard(card, faceDown=false, small=false){
+      const el = document.createElement('div');
+      el.className = 'card' + (faceDown? ' face-down':'') + (small? ' small':'');
+      if(!faceDown){
+        const suitSym = card.suit === 'Hearts' ? '♥' : card.suit === 'Diamonds' ? '♦' : card.suit === 'Spades' ? '♠' : '♣';
+        el.innerHTML = `<div class="suit">${suitSym}</div><div class="rank">${card.rank}</div>`;
+      } else {
+        el.textContent = '';
+      }
+      return el;
+    }
+
+    function log(msg){
+      const p=document.createElement('div');p.textContent=msg;logEl.prepend(p);
+    }
+
+    function updateCounts(){
+      countOne.textContent = `Cards: ${player_one.count()}`;
+      countTwo.textContent = `Cards: ${player_two.count()}`;
+    }
+
+    function clearPiles(){pileOne.innerHTML='';pileTwo.innerHTML='';}
+
+    function startGame(){
+      // Prepare
+      player_one = Player('One');
+      player_two = Player('Two');
+      new_deck = Deck();
+      new_deck.shuffle();
+      // deal
+      for(let i=0;i<26;i++){player_one.add_cards(new_deck.deal_one());player_two.add_cards(new_deck.deal_one());}
+      game_on = true; round=0; clearPiles(); logEl.innerHTML=''; roundNum.textContent='0'; lastWinner.textContent='—'; atWarEl.textContent='No';
+      updateCounts(); log('New game started — deck shuffled & dealt.');
+    }
+
+    async function stepRound(){
+      if(!game_on) return;
+      round++; roundNum.textContent = round;
+
+      if(player_one.count() === 0){log('Player One, out of cards! Player Two Wins!!'); game_on=false; return}
+      if(player_two.count() === 0){log('Player Two, out of cards! Player One Wins!!'); game_on=false; return}
+
+      const player_one_cards = [];
+      const player_two_cards = [];
+
+      player_one_cards.push(player_one.remove_one());
+      player_two_cards.push(player_two.remove_one());
+
+      clearPiles(); // show base
+      // animate reveal
+      await animatePlay(player_one_cards, player_two_cards);
+
+      let at_war = true;
+      atWarEl.textContent = 'No';
+
+      while(at_war){
+        const v1 = player_one_cards[player_one_cards.length-1].value;
+        const v2 = player_two_cards[player_two_cards.length-1].value;
+
+        if(v1 > v2){
+          player_one.add_cards(player_one_cards);
+          player_one.add_cards(player_two_cards);
+          log(`Player One wins round ${round} — ${player_one_cards[player_one_cards.length-1].rank} > ${player_two_cards[player_two_cards.length-1].rank}`);
+          lastWinner.textContent = 'Player One';
+          at_war = false;
+        } else if(v1 < v2){
+          player_two.add_cards(player_one_cards);
+          player_two.add_cards(player_two_cards);
+          log(`Player Two wins round ${round} — ${player_two_cards[player_two_cards.length-1].rank} > ${player_one_cards[player_one_cards.length-1].rank}`);
+          lastWinner.textContent = 'Player Two';
+          at_war = false;
+        } else {
+          // WAR
+          log('WAR!'); atWarEl.textContent = 'Yes';
+          // check if players have 5 cards to place
+          if(player_one.count() < 5){log('Player one unable to declare war — Player Two Wins'); game_on=false; return}
+          if(player_two.count() < 5){log('Player two unable to declare war — Player One Wins'); game_on=false; return}
+
+          // place 4 face-down + 1 face-up (i.e., 5 cards)
+          for(let i=0;i<5;i++){
+            player_one_cards.push(player_one.remove_one());
+            player_two_cards.push(player_two.remove_one());
+          }
+          // animate the new war cards
+          await animatePlay(player_one_cards, player_two_cards, true);
+          // loop continues to compare new last cards
+        }
+      }
+
+      updateCounts();
+    }
+
+    // animate cards onto the piles and reveal
+    function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+
+    async function animatePlay(p1cards,p2cards,warPhase=false){
+      clearPiles();
+      // show some of the cards as stacked small cards (face-down) and top card face-up
+      // for Player One
+      const stacked1 = Math.max(0, p1cards.length-1);
+      for(let i=0;i<stacked1;i++){
+        const card = renderCard(p1cards[i], true, true);
+        card.style.transform = `translate(-50%,-50%) translateY(${-(i*2)}px)`;
+        card.style.opacity = 0.9 - Math.min(0.6, i*0.02);
+        pileOne.appendChild(card);
+      }
+      const top1 = renderCard(p1cards[p1cards.length-1], false, false);
+      top1.style.zIndex = 99; top1.style.transform = 'translate(-50%,-50%) scale(0.98)';
+      pileOne.appendChild(top1);
+
+      // Player Two
+      const stacked2 = Math.max(0, p2cards.length-1);
+      for(let i=0;i<stacked2;i++){
+        const card = renderCard(p2cards[i], true, true);
+        card.style.transform = `translate(-50%,-50%) translateY(${-(i*2)}px)`;
+        card.style.opacity = 0.9 - Math.min(0.6, i*0.02);
+        pileTwo.appendChild(card);
+      }
+      const top2 = renderCard(p2cards[p2cards.length-1], false, false);
+      top2.style.zIndex = 99; top2.style.transform = 'translate(-50%,-50%) scale(0.98)';
+      pileTwo.appendChild(top2);
+
+      // small pause to let user see
+      await wait(600);
+
+      // small flip animation to emphasize comparison
+      top1.style.transform += ' rotateX(20deg)';
+      top2.style.transform += ' rotateX(20deg)';
+
+      await wait(250);
+
+      // settle
+      top1.style.transform = top1.style.transform.replace(' rotateX(20deg)','');
+      top2.style.transform = top2.style.transform.replace(' rotateX(20deg)','');
+
+      // if warPhase, put brief extra pause
+      if(warPhase) await wait(350);
+    }
+
+    // Auto play toggle
+    function toggleAuto(){
+      if(autoInterval){clearInterval(autoInterval);autoInterval=null;document.getElementById('autoBtn').textContent='Auto Play';return}
+      document.getElementById('autoBtn').textContent='Pause';
+      autoInterval = setInterval(async ()=>{
+        if(!game_on){clearInterval(autoInterval);autoInterval=null;document.getElementById('autoBtn').textContent='Auto Play';return}
+        await stepRound();
+      },700);
+    }
+
+    // reset
+    function resetAll(){
+      if(autoInterval){clearInterval(autoInterval);autoInterval=null;document.getElementById('autoBtn').textContent='Auto Play'}
+      game_on=false; clearPiles(); logEl.innerHTML=''; round=0; roundNum.textContent='0'; lastWinner.textContent='—'; atWarEl.textContent='No';
+      countOne.textContent='Cards: 0'; countTwo.textContent='Cards: 0';
+    }
+
+    // UI wiring
+    document.getElementById('startBtn').addEventListener('click',startGame);
+    document.getElementById('stepBtn').addEventListener('click',()=>{ if(!game_on){startGame();} stepRound(); });
+    document.getElementById('autoBtn').addEventListener('click',()=>{ if(!game_on){startGame();} toggleAuto(); });
+    document.getElementById('resetBtn').addEventListener('click',resetAll);
+
+    // init minimal
+    resetAll();
+  </script>
+</body>
+</html>
